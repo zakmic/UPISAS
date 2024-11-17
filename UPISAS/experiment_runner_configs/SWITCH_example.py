@@ -1,4 +1,3 @@
-from EventManager.Models.RunnerEvents import RunnerEvents
 from EventManager.EventSubscriptionController import EventSubscriptionController
 from ConfigValidator.Config.Models.RunTableModel import RunTableModel
 from ConfigValidator.Config.Models.FactorModel import FactorModel
@@ -80,7 +79,7 @@ class RunnerConfig:
     def before_run(self) -> None:
         """Perform any activity required before starting a run.
         No context is available here as the run is not yet active (BEFORE RUN)"""
-        self.exemplar = SWIM(auto_start=True)
+        self.exemplar = SWITCH()
         self.strategy = ReactiveAdaptationManager(self.exemplar)
         time.sleep(3)
         output.console_log("Config.before_run() called!")

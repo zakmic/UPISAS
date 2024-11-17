@@ -1,22 +1,25 @@
 # test_strategy.py
 
 import unittest
-import UPISAS.exemplars.switch as switch
+from UPISAS.strategies.SwitchStrategy import SwitchStrategy
+from UPISAS.exemplars.switch_exemplar import SwitchExemplar
+import UPISAS.exemplars.switch_interface as SwitchInterface
+
 
 class TestStrategy(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        # Verify that the API is up and running by calling get_monitor_data
+    def setUp(self):
+        self.exemplar = SwitchExemplar(auto_start=False)
+        self.strategy = SwitchStrategy(self.exemplar)
         try:
-            cls.monitor_data = switch.get_monitor_data()
-            assert cls.monitor_data is not None, "Monitor data should not be None"
+            self.monitor_data = SwitchInterface.get_monitor_data()
+            assert self.monitor_data is not None, "Monitor data should not be None"
             print("API is up and running.")
         except Exception as e:
             raise Exception(f"API is not running or /monitor endpoint failed during setUpClass: {e}")
 
     def test_monitor_successfully(self):
-        data = switch.get_monitor_data()
+        data = SwitchInterface.get_monitor_data()
         self.assertTrue(len(data) > 0, "Monitor data should not be empty")
         # Optionally, check for expected keys
         expected_keys = ["input_rate", "model"]
@@ -25,8 +28,7 @@ class TestStrategy(unittest.TestCase):
             self.assertIn(key, data, f"Key '{key}' not found in monitor data")
 
     def test_get_adaptation_options(self):
-        """Test that adaptation options are retrieved successfully."""
-        options = switch.get_adaptation_options()
+        options = SwitchInterface.get_adaptation_options()
         self.assertIsNotNone(options, "Adaptation options should not be None")
         self.assertIsInstance(options, dict, "Adaptation options should be a dictionary")
         self.assertTrue(len(options) > 0, "Adaptation options should not be empty")
@@ -45,17 +47,33 @@ class TestStrategy(unittest.TestCase):
         """Test that an adaptation option can be updated successfully."""
         option_to_update = 'yolov5n_rate_min'
         new_value = 0.5
-        result = switch.execute_action(option_to_update, new_value)
+        result = SwitchInterface.execute_action(option_to_update, new_value)
         self.assertIn('message', result, "Response does not contain 'message'")
         self.assertIn("updated to", result['message'], "Update confirmation not found in response message")
         # Verify that the adaptation option was updated
-        options = switch.get_adaptation_options()
+        options = SwitchInterface.get_adaptation_options()
         updated_value = float(options.get(option_to_update))
         self.assertEqual(
             updated_value, new_value,
             f"Adaptation option '{option_to_update}' expected to be {new_value}, but got {updated_value}"
         )
 
+    def test_analyze_successfully(self):
+        # self.strategy = SwitchStrategy(self.exemplar)
+        self.strategy.get_monitor_schema()
+        self.strategy.monitor()
+        successful = self.strategy.analyze()
+        self.assertTrue(successful)
+        # self.assertNotEqual(self.strategy.knowledge.analysis_data, dict())
+
+    def test_plan_successfully(self):
+        self.strategy.get_monitor_schema()
+        self.strategy.monitor()
+        self.strategy.analyze()
+        successful = self.strategy.plan()
+        self.assertTrue(successful)
+        self.assertTrue(successful)
+        self.assertNotEqual(self.strategy.knowledge.plan_data, dict())
 
 
 if __name__ == '__main__':
