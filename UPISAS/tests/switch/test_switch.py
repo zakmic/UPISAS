@@ -1,6 +1,8 @@
 # test_strategy.py
 
 import unittest
+from time import sleep
+
 from UPISAS.strategies.SwitchStrategy import SwitchStrategy
 from UPISAS.exemplars.switch_exemplar import SwitchExemplar
 import UPISAS.exemplars.switch_interface as SwitchInterface
@@ -74,6 +76,15 @@ class TestStrategy(unittest.TestCase):
         self.assertTrue(successful)
         self.assertTrue(successful)
         self.assertNotEqual(self.strategy.knowledge.plan_data, dict())
+
+    def test_MAPE_Loop(self):
+        successful = False
+        while successful == False:
+            self.strategy.get_monitor_schema()
+            self.strategy.monitor()
+            self.strategy.analyze()
+            successful = self.strategy.plan()
+            sleep(30)
 
 
 if __name__ == '__main__':
