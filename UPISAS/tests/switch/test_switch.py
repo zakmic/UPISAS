@@ -84,7 +84,13 @@ class TestStrategy(unittest.TestCase):
             self.strategy.monitor()
             self.strategy.analyze()
             successful = self.strategy.plan()
-            sleep(30)
+            sleep(5)
+
+    def test_inputrate(self):
+        successful = False
+        while successful == False:
+            self.strategy.analyze()
+            sleep(1)
 
 
 if __name__ == '__main__':

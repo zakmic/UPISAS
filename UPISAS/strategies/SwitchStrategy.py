@@ -49,6 +49,7 @@ class SwitchStrategy(Strategy):
         model = data["model"]
         self.knowledge.analysis_data['input_rate'] = input_rate
         self.knowledge.analysis_data['current_model'] = model
+        print(input_rate)
 
         # Get threshold keys for the current model
         str_min = f"{model}_rate_min"
