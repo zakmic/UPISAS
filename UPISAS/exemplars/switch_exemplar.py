@@ -3,7 +3,7 @@ import UPISAS.exemplars.switch_interface as switch_interface
 
 class SwitchExemplar(Exemplar):
     def __init__(self, auto_start=False):
-        self.start_run(self)
+        self.start_run()  # Call the no-app version
         self.base_endpoint = "http://localhost:8000"
         # docker_config = {
         #     "name":  "switch",
@@ -17,16 +17,18 @@ class SwitchExemplar(Exemplar):
         try:
             self.monitor_data = switch_interface.get_monitor_data()
             assert self.monitor_data is not None, "Monitor data should not be None"
+            print(self.monitor_data)
             print("API is up and running.")
         except Exception as e:
             raise Exception(f"API is not running or /monitor endpoint failed during setUpClass: {e}")
 
-    def start_run(self, app):
+    def start_run_app(self, app):
         print("ARGHHH")
         self.API = switch_interface
         try:
             self.monitor_data = switch_interface.get_monitor_data()
             assert self.monitor_data is not None, "Monitor data should not be None"
+            print(self.monitor_data)
             print("API is up and running.")
         except Exception as e:
             raise Exception(f"API is not running or /monitor endpoint failed during setUpClass: {e}")
