@@ -62,7 +62,7 @@ class RunnerConfig:
             (RunnerEvents.AFTER_EXPERIMENT, self.after_experiment)
         ])
         self.run_table_model = None  # Initialized later
-        self.total_imgs = 25 # Total number of images in the experiment
+        self.total_imgs = 27 # Total number of images in the experiment
 
         output.console_log("Custom config loaded")
 
@@ -161,76 +161,78 @@ class RunnerConfig:
 
         # Extract data fields for calculation
         confidence = data.get("confidence", [])
-        time_to_process = data.get("absolute_time_from_start", [])
+        absolute_time_from_start = data.get("absolute_time_from_start", [])
         cpu_utility = data.get("cpu", [])
         detection_boxes = data.get("detection_boxes", [])
         model_processing_time = data.get("model_processing_time", [])
         image_processing_time = data.get("image_processing_time", [])
         utility = data.get("utility", [])
         models = data.get("model", [])
-
-        # Calculate averages for numerical fields
-        avg_confidence = sum(confidence) / len(confidence) if confidence else 0
-        avg_time_to_process = sum(time_to_process) / len(time_to_process) if time_to_process else 0
-        avg_cpu_utility = sum(cpu_utility) / len(cpu_utility) if cpu_utility else 0
-        avg_detection_boxes = sum(detection_boxes) / len(detection_boxes) if detection_boxes else 0
-        avg_model_processing_time = sum(model_processing_time) / len(
-            model_processing_time) if model_processing_time else 0
-        avg_image_processing_time = sum(image_processing_time) / len(
-            image_processing_time) if image_processing_time else 0
-        avg_utility = sum(utility) / len(utility) if utility else 0
+        model_name = data.get("model_name", [])
+        timestamp = data.get("timestamp", [])
 
         # Count occurrences of each model
         model_counts = Counter(models)
 
-        # Prepare data dictionary for CSV and return
-        run_data = {
-            "confidence": avg_confidence,
-            "time_to_process": avg_time_to_process,
-            "cpu_utility": avg_cpu_utility,
-            "detection_boxes": avg_detection_boxes,
-            "model_processing_time": avg_model_processing_time,
-            "image_processing_time": avg_image_processing_time,
-            "utility": avg_utility,
-            "model_counts": dict(model_counts)  # Converting Counter to dict for easier serialization
-        }
+        # Prepare CSV file name
+        csv_filename = "run.csv"
 
-        csv_filename = f"run.csv"
-
-        # Write to CSV file
+        # Write every log entry to CSV file
         try:
-            # Check if the file exists to determine if we need to write the header
             write_header = not os.path.exists(csv_filename)
 
             with open(csv_filename, mode='a', newline='') as csv_file:
-                fieldnames = ["confidence", "time_to_process", "cpu_utility", "detection_boxes",
-                              "model_processing_time", "image_processing_time", "utility", "model_counts"]
+                fieldnames = [
+                    "timestamp", "confidence", "absolute_time_from_start", "cpu_utility",
+                    "detection_boxes", "model_processing_time", "image_processing_time",
+                    "utility", "model"
+                ]
 
                 writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
                 if write_header:
                     writer.writeheader()  # Write header only if the file is new
-                flattened_run_data = {key: run_data[key] if key != "model_counts" else str(run_data[key])
-                                      for key in run_data}
-                writer.writerow(flattened_run_data)
+
+                # Write each log entry to CSV
+                for i in range(len(confidence)):
+                    log_entry = {
+                        "timestamp": timestamp[i] if i < len(timestamp) else None,
+                        "confidence": confidence[i] if i < len(confidence) else None,
+                        "absolute_time_from_start": absolute_time_from_start[i] if i < len(
+                            absolute_time_from_start) else None,
+                        "cpu_utility": cpu_utility[i] if i < len(cpu_utility) else None,
+                        "detection_boxes": detection_boxes[i] if i < len(detection_boxes) else None,
+                        "model_processing_time": model_processing_time[i] if i < len(model_processing_time) else None,
+                        "image_processing_time": image_processing_time[i] if i < len(image_processing_time) else None,
+                        "utility": utility[i] if i < len(utility) else None,
+                        "model": models[i] if i < len(models) else None
+                    }
+                    writer.writerow(log_entry)
+
+                # Append a dotted line separator only once at the end of all log entries for the current run
+                writer.writerow({field: "----" for field in fieldnames})
 
         except Exception as e:
             output.console_log(f"Error writing to CSV {csv_filename}: {e}")
 
+        # Print data for debugging
         print("Data:", data)
         print("Averages:")
-        print(f"Confidence: {avg_confidence}, Time to Process: {avg_time_to_process}, CPU Utility: {avg_cpu_utility}")
-        print(f"Detection Boxes: {avg_detection_boxes}, Model Processing Time: {avg_model_processing_time}")
-        print(f"Image Processing Time: {avg_image_processing_time}, Utility: {avg_utility}")
+        print(f"Confidence: {confidence}")
+        print(f"CPU Utility: {cpu_utility}")
         print("Model Counts:", model_counts)
 
         return {
-            "confidence": avg_confidence,
-            "time_to_process": avg_time_to_process,
-            "cpu_utility": avg_cpu_utility,
-            "detection_boxes": avg_detection_boxes,
-            "model_processing_time": avg_model_processing_time,
-            "image_processing_time": avg_image_processing_time,
-            "utility": avg_utility,
+            "confidence": sum(confidence) / len(confidence) if confidence else 0,
+            "absolute_time_from_start": sum(absolute_time_from_start) / len(
+                absolute_time_from_start) if absolute_time_from_start else 0,
+            "cpu_utility": sum(cpu_utility) / len(cpu_utility) if cpu_utility else 0,
+            "detection_boxes": sum(detection_boxes) / len(detection_boxes) if detection_boxes else 0,
+            "model_processing_time": sum(model_processing_time) / len(
+                model_processing_time) if model_processing_time else 0,
+            "image_processing_time": sum(image_processing_time) / len(
+                image_processing_time) if image_processing_time else 0,
+            "utility": sum(utility) / len(utility) if utility else 0,
             "model_counts": dict(model_counts)  # Return model counts for reference
         }
 
