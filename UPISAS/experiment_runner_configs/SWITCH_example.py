@@ -1,7 +1,3 @@
-import csv
-import os
-from collections import Counter
-
 from EventManager.Models.RunnerEvents import RunnerEvents
 from EventManager.EventSubscriptionController import EventSubscriptionController
 from ConfigValidator.Config.Models.RunTableModel import RunTableModel
@@ -19,8 +15,6 @@ import statistics
 
 from UPISAS.exemplars.switch_exemplar import SwitchExemplar
 from UPISAS.strategies.SwitchStrategy import SwitchStrategy
-from UPISAS.strategies.swim_reactive_strategy import ReactiveAdaptationManager
-from UPISAS.exemplars.swim import SWIM
 
 
 class RunnerConfig:
@@ -55,9 +49,9 @@ class RunnerConfig:
             (RunnerEvents.BEFORE_RUN, self.before_run),
             (RunnerEvents.START_RUN, self.start_run),
             (RunnerEvents.START_MEASUREMENT, self.start_measurement),
-            (RunnerEvents.INTERACT, self.interact),
-            (RunnerEvents.STOP_MEASUREMENT, self.stop_measurement),
-            (RunnerEvents.STOP_RUN, self.stop_run),
+            (RunnerEvents.INTERACT         , self.interact         ),
+            (RunnerEvents.STOP_MEASUREMENT , self.stop_measurement ),
+            # (RunnerEvents.STOP_RUN         , self.stop_run         ),
             (RunnerEvents.POPULATE_RUN_DATA, self.populate_run_data),
             (RunnerEvents.AFTER_EXPERIMENT, self.after_experiment)
         ])
@@ -91,7 +85,7 @@ class RunnerConfig:
     def before_run(self) -> None:
         """Perform any activity required before starting a run.
         No context is available here as the run is not yet active (BEFORE RUN)"""
-        self.exemplar = SwitchExemplar()
+        self.exemplar = SwitchExemplar(auto_start=False)
         self.strategy = SwitchStrategy(self.exemplar)
         time.sleep(3)
 
@@ -121,16 +115,15 @@ class RunnerConfig:
         time_slept = 0
         self.strategy.get_monitor_schema()
         self.strategy.get_adaptation_options_schema()
-        self.strategy.get_execute_schema()
-        done = False
+        # self.strategy.get_execute_schema()
 
         while done == False:
             self.strategy.monitor(verbose=True)
             current_img = self.strategy.knowledge.monitored_data["log_id"][-1]
             print("LOG_ID", current_img)
             if self.strategy.analyze():
-                    self.strategy.plan()
-                    # self.strategy.execute() To be done in Ass 2
+                self.strategy.plan()
+
             time.sleep(3)
             time_slept += 3
             done = current_img == self.total_imgs
@@ -156,26 +149,17 @@ class RunnerConfig:
 
         output.console_log("Config.populate_run_data() called!")
 
-        # Get monitored data
-        data = self.strategy.knowledge.monitored_data
-
-        # Extract data fields for calculation
-        confidence = data.get("confidence", [])
-        absolute_time_from_start = data.get("absolute_time_from_start", [])
-        cpu_utility = data.get("cpu", [])
-        detection_boxes = data.get("detection_boxes", [])
-        model_processing_time = data.get("model_processing_time", [])
-        image_processing_time = data.get("image_processing_time", [])
-        utility = data.get("utility", [])
-        models = data.get("model", [])
-        model_name = data.get("model_name", [])
-        timestamp = data.get("timestamp", [])
-
-        # Count occurrences of each model
-        model_counts = Counter(models)
-
-        # Prepare CSV file name
-        csv_filename = "run.csv"
+        basicRevenue = 1
+        optRevenue = 1.5
+        serverCost = 10
+        
+        precision = 1e-5
+        mon_data = self.strategy.knowledge.monitored_data
+        utilities = []
+        print("MON DATA")
+        print(mon_data)
+        utilities = mon_data
+        return {"utility" : utilities}
 
         # Write every log entry to CSV file
         try:
