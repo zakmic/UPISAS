@@ -1,3 +1,4 @@
+import os
 import time
 import pandas as pd
 from UPISAS.strategy import Strategy
@@ -5,6 +6,7 @@ import UPISAS.exemplars.switch_interface as switch
 
 
 def _load_thresholds():
+    print("Current working directory:", os.getcwd())
     df = pd.read_csv('knowledge.csv', header=None)
     array = df.to_numpy()
 
