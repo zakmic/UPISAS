@@ -62,7 +62,7 @@ class RunnerConfig:
             (RunnerEvents.AFTER_EXPERIMENT, self.after_experiment)
         ])
         self.run_table_model = None  # Initialized later
-        self.total_imgs = 27 # Total number of images in the experiment
+        self.total_imgs = 300 # Total number of images in the experiment
 
         output.console_log("Custom config loaded")
 
@@ -131,8 +131,8 @@ class RunnerConfig:
             if self.strategy.analyze():
                     self.strategy.plan()
                     # self.strategy.execute() To be done in Ass 2
-            time.sleep(3)
-            time_slept += 3
+            time.sleep(1)
+            time_slept += 1
             done = current_img == self.total_imgs
 
         output.console_log("Config.interact() called!")
@@ -160,6 +160,7 @@ class RunnerConfig:
         data = self.strategy.knowledge.monitored_data
 
         # Extract data fields for calculation
+        input_rate = data.get("input_rate", [])
         confidence = data.get("confidence", [])
         absolute_time_from_start = data.get("absolute_time_from_start", [])
         cpu_utility = data.get("cpu", [])
@@ -170,6 +171,7 @@ class RunnerConfig:
         models = data.get("model", [])
         model_name = data.get("model_name", [])
         timestamp = data.get("timestamp", [])
+        log = data.get("log_id", [])
 
         # Count occurrences of each model
         model_counts = Counter(models)
@@ -183,9 +185,9 @@ class RunnerConfig:
 
             with open(csv_filename, mode='a', newline='') as csv_file:
                 fieldnames = [
-                    "timestamp", "confidence", "absolute_time_from_start", "cpu_utility",
+                    "image", "timestamp",  "input_rate", "confidence", "absolute_time_from_start", "cpu_utility",
                     "detection_boxes", "model_processing_time", "image_processing_time",
-                    "utility", "model"
+                    "utility", "model",
                 ]
 
                 writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -196,7 +198,9 @@ class RunnerConfig:
                 # Write each log entry to CSV
                 for i in range(len(confidence)):
                     log_entry = {
+                        "image": log[i] if i < len(log) else None,
                         "timestamp": timestamp[i] if i < len(timestamp) else None,
+                        "input_rate": input_rate[i] if i < len(input_rate) else None,
                         "confidence": confidence[i] if i < len(confidence) else None,
                         "absolute_time_from_start": absolute_time_from_start[i] if i < len(
                             absolute_time_from_start) else None,

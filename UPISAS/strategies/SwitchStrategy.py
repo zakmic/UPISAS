@@ -34,7 +34,7 @@ class SwitchStrategy(Strategy):
         # Get monitoring data
         data = switch.get_monitor_data()
         input_rate = data["input_rate"]
-        cpu_utilization = data["cpu"]  # Assume 'cpu' is a field representing CPU utilization percentage
+        cpu_utilization = data["cpu"]
         model = data["model"]
 
         # Store data for further use
