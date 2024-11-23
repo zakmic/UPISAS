@@ -25,7 +25,7 @@ class TestStrategy(unittest.TestCase):
         data = SwitchInterface.get_monitor_data()
         self.assertTrue(len(data) > 0, "Monitor data should not be empty")
         # Optionally, check for expected keys
-        expected_keys = ["input_rate", "model"]
+        expected_keys = ["input_rate", "model", "cpu", "confidence", "image_processing_time"]
         for key in expected_keys:
             print(key, data[key])
             self.assertIn(key, data, f"Key '{key}' not found in monitor data")
@@ -111,45 +111,69 @@ class TestStrategy(unittest.TestCase):
         self.assertTrue(successful)
         self.assertNotEqual(self.strategy.knowledge.plan_data, dict())
 
-    def test_monitor_data(self):
-        successful = False
-        while successful == False:
-            data = SwitchInterface.get_monitor_data()
-            expected_keys = [
-                "input_rate",
-                "model",
-                "timestamp",
-                "log_id",
-                "confidence",
-                "model_name",
-                "cpu",
-                "detection_boxes",
-                "model_processing_time",
-                "image_processing_time",
-                "absolute_time_from_start",
-                "utility"
-            ]
-            for key in expected_keys:
-                print(key, data[key])
-                self.assertIn(key, data, f"Key '{key}' not found in monitor data")
+    def test_plan_thresholds_change(self):
+        # Mock
+        self.strategy.knowledge.analysis_data = {
+            'input_rate': 100,
+            'cpu': 85,
+            'model': 'yolov5m'
+        }
 
-            print("___________________________________")
-            sleep(5)
+        # Execute
+        self.strategy.plan()
 
-    def test_MAPE_Loop(self):
-        successful = False
-        while successful == False:
-            self.strategy.get_monitor_schema()
-            self.strategy.monitor()
-            self.strategy.analyze()
-            successful = self.strategy.plan()
-            sleep(5)
+        updated_min = self.strategy.knowledge.plan_data[0]['new_value']
+        updated_max = self.strategy.knowledge.plan_data[1]['new_value']
 
-    def test_inputrate(self):
-        successful = False
-        while successful == False:
-            self.strategy.analyze()
-            sleep(1)
+        expected_min = 100 * 0.9
+        expected_max = 100 * 1.1
+
+        # Assert
+        self.assertEqual(updated_min, expected_min,
+                         f"Expected min threshold to be {expected_min}, but got {updated_min}")
+        self.assertEqual(updated_max, expected_max,
+                         f"Expected max threshold to be {expected_max}, but got {updated_max}")
+
+    # Loop tests
+    # def test_monitor_data(self):
+    #     successful = False
+    #     while successful == False:
+    #         data = SwitchInterface.get_monitor_data()
+    #         expected_keys = [
+    #             "input_rate",
+    #             "model",
+    #             "timestamp",
+    #             "log_id",
+    #             "confidence",
+    #             "model_name",
+    #             "cpu",
+    #             "detection_boxes",
+    #             "model_processing_time",
+    #             "image_processing_time",
+    #             "absolute_time_from_start",
+    #             "utility"
+    #         ]
+    #         for key in expected_keys:
+    #             print(key, data[key])
+    #             self.assertIn(key, data, f"Key '{key}' not found in monitor data")
+    #
+    #         print("___________________________________")
+    #         sleep(5)
+    #
+    # def test_MAPE_Loop(self):
+    #     successful = False
+    #     while successful == False:
+    #         self.strategy.get_monitor_schema()
+    #         self.strategy.monitor()
+    #         self.strategy.analyze()
+    #         successful = self.strategy.plan()
+    #         sleep(5)
+    #
+    # def test_inputrate(self):
+    #     successful = False
+    #     while successful == False:
+    #         self.strategy.analyze()
+    #         sleep(1)
 
 
 if __name__ == '__main__':

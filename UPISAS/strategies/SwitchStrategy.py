@@ -37,38 +37,44 @@ class SwitchStrategy(Strategy):
         data = switch.get_monitor_data()
         input_rate = data["input_rate"]
         cpu_utilization = data["cpu"]
+        confidence = data["confidence"]
+        processing_time = data["image_processing_time"]
         model = data["model"]
 
         # Store data for further use
         self.knowledge.analysis_data['input_rate'] = input_rate
         self.knowledge.analysis_data['cpu'] = cpu_utilization
         self.knowledge.analysis_data['model'] = model
+        self.knowledge.analysis_data['confidence'] = confidence
+        self.knowledge.analysis_data['image_processing_time'] = processing_time
 
-        print(f"Input Rate: {input_rate}, CPU Utilization: {cpu_utilization}")
+        print(f"Input Rate: {input_rate}, CPU Utilization: {cpu_utilization}, Confidence: {confidence}, Processing Time: {processing_time}, Model: {model}")
 
-        # Get threshold keys for the current model
+        alpha_cpu, alpha_conf, alpha_pt = 0.5, 0.25, 0.25
+        gamma = (cpu_utilization * alpha_cpu - confidence * alpha_conf + processing_time * alpha_pt)
+        print(f"Effectiveness Metric (Gamma): {gamma}")
+
         str_min = f"{model}_rate_min"
         str_max = f"{model}_rate_max"
 
-        # Fetch min and max thresholds
         min_val = self.thresholds.get(str_min)
         max_val = self.thresholds.get(str_max)
         current_time = time.time()
 
         # Check if the input rate violates thresholds or if CPU utilization is too high
         threshold_violation = not (min_val <= input_rate <= max_val)
-        high_cpu_utilization = cpu_utilization > 80  # Assume 80% CPU usage is a high threshold
+        high_cpu_utilization = cpu_utilization > 80
+        low_effectiveness = gamma > 1.0
 
-        # Track time for threshold violation persistence
-        if threshold_violation or high_cpu_utilization:
-            print("Thresholds violated or CPU utilization too high")
+        if threshold_violation or high_cpu_utilization or low_effectiveness:
+            print("Thresholds violated, CPU utilization too high, or low effectiveness detected")
             if self.time == -1:
                 self.time = current_time
             elif (current_time - self.time) > 0.25:  # Threshold violation persists
                 self.count += 1
                 print({'Component': "Analyzer", "Action": "Creating adaptation plan"})
         else:
-            self.time = -1  # Reset the timer if thresholds are not violated
+            self.time = -1
 
         return True
 
@@ -79,12 +85,11 @@ class SwitchStrategy(Strategy):
         model = self.knowledge.analysis_data['model']
 
         # Adapt thresholds based on analysis data
-        # Adjust threshold based on CPU utilization or input rate analysis
         new_min_threshold = input_rate * 0.9 if cpu_utilization > 80 else input_rate * 0.95
         new_max_threshold = input_rate * 1.1 if cpu_utilization > 80 else input_rate * 1.05
 
         # Ensure the values make logical sense for adaptation
-        new_min_threshold = max(0, new_min_threshold)  # Minimum cannot be less than 0
+        new_min_threshold = max(0, new_min_threshold)
 
         # Create plan_data entries compatible with the execute schema
         self.knowledge.plan_data = [
