@@ -57,19 +57,28 @@ plt.ylabel("Processing Time (s)")
 plt.grid()
 plt.show()
 
-# Select only numeric columns for correlation calculation
-numeric_data = data.select_dtypes(include=["number"])
-correlations = numeric_data.corr()
-
-# Display the correlation matrix
-print("Correlations between numeric metrics:")
-print(correlations)
-
-# Optional: Visualize the correlation matrix
-plt.figure(figsize=(10, 8))
-plt.matshow(correlations, fignum=1, cmap="coolwarm")
-plt.colorbar()
-plt.xticks(range(len(correlations.columns)), correlations.columns, rotation=45, ha="left")
-plt.yticks(range(len(correlations.columns)), correlations.columns)
-plt.title("Correlation Matrix of Numeric Metrics", pad=20)
+# Plot 4: Image processing time progression
+plt.figure(figsize=(10, 6))
+plt.plot(data["image"], data["model_processing_time"], label="Image Processing Time", marker="o")
+plt.title("Model Processing Time Progression")
+plt.xlabel("Image Number")
+plt.ylabel("Processing Time (s)")
+plt.grid()
 plt.show()
+
+# # Select only numeric columns for correlation calculation
+# numeric_data = data.select_dtypes(include=["number"])
+# correlations = numeric_data.corr()
+#
+# # Display the correlation matrix
+# print("Correlations between numeric metrics:")
+# print(correlations)
+#
+# # Optional: Visualize the correlation matrix
+# plt.figure(figsize=(10, 8))
+# plt.matshow(correlations, fignum=1, cmap="coolwarm")
+# plt.colorbar()
+# plt.xticks(range(len(correlations.columns)), correlations.columns, rotation=45, ha="left")
+# plt.yticks(range(len(correlations.columns)), correlations.columns)
+# plt.title("Correlation Matrix of Numeric Metrics", pad=20)
+# plt.show()

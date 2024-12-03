@@ -1,3 +1,7 @@
+import csv
+import os
+from collections import Counter
+
 from EventManager.Models.RunnerEvents import RunnerEvents
 from EventManager.EventSubscriptionController import EventSubscriptionController
 from ConfigValidator.Config.Models.RunTableModel import RunTableModel
@@ -14,7 +18,10 @@ import time
 import statistics
 
 from UPISAS.exemplars.switch_exemplar import SwitchExemplar
-from UPISAS.strategies.SwitchStrategy import SwitchStrategy
+
+# Choose if Baseline or Predictive
+# from UPISAS.strategies.BaselineSwitchStrategy import SwitchStrategy
+from UPISAS.strategies.PredictiveSwitchStrategy import SwitchStrategy
 
 
 class RunnerConfig:
@@ -115,15 +122,19 @@ class RunnerConfig:
         time_slept = 0
         self.strategy.get_monitor_schema()
         self.strategy.get_adaptation_options_schema()
-        # self.strategy.get_execute_schema()
+        self.strategy.get_execute_schema()
+        done = False
 
         while done == False:
             self.strategy.monitor(verbose=True)
             current_img = self.strategy.knowledge.monitored_data["log_id"][-1]
             print("LOG_ID", current_img)
             if self.strategy.analyze():
-                    self.strategy.plan()
-                    # self.strategy.execute() To be done in Ass 2
+                   if self.strategy.plan():
+                       if self.strategy.knowledge.plan_data is not None:
+                            self.strategy.execute()
+                       else:
+                           print("MAPE-K Loop: No adaptation")
             time.sleep(1)
             time_slept += 1
             done = current_img == self.total_imgs
@@ -154,12 +165,8 @@ class RunnerConfig:
         serverCost = 10
         
         precision = 1e-5
-        mon_data = self.strategy.knowledge.monitored_data
+        data = self.strategy.knowledge.monitored_data
         utilities = []
-        print("MON DATA")
-        print(mon_data)
-        utilities = mon_data
-        return {"utility" : utilities}
 
         # Extract data fields for calculation
         input_rate = data.get("input_rate", [])
