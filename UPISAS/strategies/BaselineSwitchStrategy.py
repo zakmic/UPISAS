@@ -35,6 +35,7 @@ class SwitchStrategy(Strategy):
         image_processing_time = data["image_processing_time"]
         model_processing_time = data["model_processing_time"]
         model = data["model"]
+        utility = data["utility"]
 
         # Store data for further use
         # self.knowledge.analysis_data['input_rate'] = input_rate
@@ -54,13 +55,11 @@ class SwitchStrategy(Strategy):
 
         # Determine if adaptation is needed
         if (cpu_utilization > THRESHOLDS["cpu_utilization"]["upper"]) or \
-                (image_processing_time > THRESHOLDS["processing_time"]["upper"]) or \
                 (model_processing_time > THRESHOLDS["processing_time"]["upper"]) or \
                 (confidence < THRESHOLDS["confidence"]["lower"]):
             _pending_adaptation = 'smaller'
         elif (cpu_utilization < THRESHOLDS["cpu_utilization"]["lower"]) or \
                 (confidence >= THRESHOLDS["confidence"]["lower"] and
-                 image_processing_time <= THRESHOLDS["processing_time"]["upper"] and
                  model_processing_time <= THRESHOLDS["processing_time"]["upper"]):
             _pending_adaptation = 'larger'
 
@@ -88,15 +87,21 @@ class SwitchStrategy(Strategy):
             model = self.knowledge.analysis_data['model']
             model_index = model_to_option(model)
 
-            if self.adaptation_needed == 'smaller':
+            if self.adaptation_needed == 'smaller' and model_index > 1:
                 new_model_index = max(1, model_index - 1)
-            elif self.adaptation_needed == 'larger':
+            elif self.adaptation_needed == 'larger' and model_index < 5:
                 new_model_index = min(5, model_index + 1)
+            else:
+                print(f"Current model is already the {self.adaptation_needed} model, no need to change.")
+                new_model_index = model_index
 
-
-            print(f"Switching model from {model} to {self.adaptation_needed}.")
-            # Store the plan to switch model
-            self.knowledge.plan_data = {'model_option': new_model_index}
+            if new_model_index != model_index:
+                print(f"Switching model from {model} to {self.adaptation_needed}.")
+                # Store the plan to switch model
+                self.knowledge.plan_data = {'model_option': new_model_index}
+            else:
+                print("No adaptation needed as the current model is already optimal.")
+                self.knowledge.plan_data = None
         else:
             print("No adaptation needed")
             self.knowledge.plan_data = None

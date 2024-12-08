@@ -1,34 +1,67 @@
+import docker
+import logging
 from UPISAS.exemplar import Exemplar
-import UPISAS.exemplars.switch_interface as switch_interface
+
+logging.getLogger().setLevel(logging.INFO)
+
 
 class SwitchExemplar(Exemplar):
-    def __init__(self, auto_start=False):
-        self.start_run()  # Call the no-app version
-        self.base_endpoint = "http://localhost:8000"
-        # docker_config = {
-        #     "name":  "switch",
-        #     "image": "switch-backend:latest",
-        #     "ports" : {8000: 8000}}
-        #
-        # super().__init__("http://localhost:8000", docker_config, auto_start)
+    """
+    A class to manage the backend container for a self-adaptive system.
+    """
+
+    def __init__(self, auto_start: bool = False, container_name: str = "backend"):
+        """
+        Initialize the SwitchExemplar with the backend Docker configuration.
+
+        :param auto_start: Whether to immediately start the container after creation.
+        :param container_name: Name of the backend Docker container.
+        """
+        backend_docker_kwargs = {
+            "name": container_name,
+            "image": "switch-backend:latest",  # Backend image defined in Dockerfile
+            "ports": {
+                3001: 3001,
+                8089: 8089,
+                5001: 5001,
+                8000: 8000,
+            },
+            "environment": {
+                "ELASTICSEARCH_HOST": "http://elasticsearch:9200",
+            },
+        }
+
+        super().__init__("http://localhost:8000", backend_docker_kwargs, auto_start)
+
+        # Attach the container to the ELK network
+        self.attach_to_network("elk")
+
+    def attach_to_network(self, network_name):
+        """
+        Attaches the container to a specified Docker network.
+
+        :param network_name: Name of the Docker network to attach the container to.
+        """
+        try:
+            docker_client = docker.from_env()
+            network = docker_client.networks.get(network_name)
+            network.connect(self.exemplar_container.id)
+            logging.info(f"Container '{self.exemplar_container.name}' attached to network '{network_name}'.")
+        except docker.errors.NotFound:
+            logging.error(f"Network '{network_name}' not found.")
+        except Exception as e:
+            logging.error(f"Error attaching to network '{network_name}': {e}")
 
     def start_run(self):
-        self.API = switch_interface
+        """
+        Start the backend container and ensure it is running.
+        """
         try:
-            self.monitor_data = switch_interface.get_monitor_data()
-            assert self.monitor_data is not None, "Monitor data should not be None"
-            print(self.monitor_data)
-            print("API is up and running.")
+            container_status = self.get_container_status()
+            if container_status == "running":
+                logging.info("Container is already running.")
+            else:
+                logging.info("Starting the backend container...")
+                self.start_container()
         except Exception as e:
-            raise Exception(f"API is not running or /monitor endpoint failed during setUpClass: {e}")
-
-    def start_run_app(self, app):
-        print("ARGHHH")
-        self.API = switch_interface
-        try:
-            self.monitor_data = switch_interface.get_monitor_data()
-            assert self.monitor_data is not None, "Monitor data should not be None"
-            print(self.monitor_data)
-            print("API is up and running.")
-        except Exception as e:
-            raise Exception(f"API is not running or /monitor endpoint failed during setUpClass: {e}")
+            logging.error(f"Error during start_run execution: {e}")

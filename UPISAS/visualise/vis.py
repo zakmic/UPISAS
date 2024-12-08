@@ -10,9 +10,22 @@ data = pd.read_csv(file_path)
 data = data.sort_values(by="image").reset_index(drop=True)
 
 # Clean the 'model' column: Convert non-string values to NaN
-data["model"] = data["model"].astype(str)
+data["model"] = data["model"].astype(str).str.strip().str.lower().str.replace(r'[\r\n]', '', regex=True)
 valid_models = ["yolov5n", "yolov5s", "yolov5m", "yolov5l", "yolov5x"]
 data["model"] = data["model"].where(data["model"].isin(valid_models))
+
+# Define valid models (ensure they are in lowercase)
+valid_models = ["yolov5n", "yolov5s", "yolov5m", "yolov5l", "yolov5x"]
+
+# Identify rows with invalid models
+invalid_model_rows = data[~data["model"].isin(valid_models)]
+
+# Print out rows with invalid models
+if not invalid_model_rows.empty:
+    print("Rows with invalid models:")
+    print(invalid_model_rows)
+else:
+    print("No invalid models found.")
 
 # Define the desired model order and ensure it's categorical
 model_categories = ["yolov5n", "yolov5s", "yolov5m", "yolov5l", "yolov5x"]
@@ -118,9 +131,9 @@ for key, grp in data.groupby('model_change'):
     ax1.axvspan(start_image, end_image, facecolor=color, alpha=0.3)
 
 # Plot image processing time
-ax1.plot(data['image'], data['image_processing_time'], label='Image Processing Time', color='green')
+ax1.plot(data['image'], data['utility'], label='utility', color='green')
 ax1.set_xlabel('Image Number')
-ax1.set_ylabel('Processing Time (s)')
+ax1.set_ylabel('Utility')
 ax1.legend(loc='upper left')
 ax1.grid()
 

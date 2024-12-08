@@ -18,10 +18,8 @@ import time
 import statistics
 
 from UPISAS.exemplars.switch_exemplar import SwitchExemplar
-
-# Choose if Baseline or Predictive
-# from UPISAS.strategies.BaselineSwitchStrategy import SwitchStrategy
-from UPISAS.strategies.PredictiveSwitchStrategy import SwitchStrategy
+from UPISAS.experiment_runner_configs.SwitchAPI import upload_files
+from UPISAS.strategies.BaselineSwitchStrategy import SwitchStrategy
 
 
 class RunnerConfig:
@@ -56,30 +54,27 @@ class RunnerConfig:
             (RunnerEvents.BEFORE_RUN, self.before_run),
             (RunnerEvents.START_RUN, self.start_run),
             (RunnerEvents.START_MEASUREMENT, self.start_measurement),
-            (RunnerEvents.INTERACT         , self.interact         ),
-            (RunnerEvents.STOP_MEASUREMENT , self.stop_measurement ),
-            # (RunnerEvents.STOP_RUN         , self.stop_run         ),
+            (RunnerEvents.INTERACT, self.interact),
+            (RunnerEvents.STOP_MEASUREMENT, self.stop_measurement),
+            (RunnerEvents.STOP_RUN, self.stop_run),
             (RunnerEvents.POPULATE_RUN_DATA, self.populate_run_data),
             (RunnerEvents.AFTER_EXPERIMENT, self.after_experiment)
         ])
         self.run_table_model = None  # Initialized later
-        self.total_imgs = 300 # Total number of images in the experiment
+        self.total_imgs = 300  # Total number of images in the experiment
 
         output.console_log("Custom config loaded")
 
     def create_run_table_model(self) -> RunTableModel:
         """Create and return the run_table model here. A run_table is a List (rows) of tuples (columns),
         representing each run performed"""
-        # 2 should choose yolo yolov5n using NAIVE
-        # 10 should choose yolo yolov5m using NAIVE
-        # 30 should choose yolo yolov5x using NAIVE
 
-        factor1 = FactorModel("input_rate", [2, 10, 30])
+        factor1 = FactorModel("input_rate", [2, 0.5, 0.05])
         self.run_table_model = RunTableModel(
             factors=[factor1],
             exclude_variations=[
             ],
-            data_columns=['time_to_process', 'cpu_utility', 'confidence']
+            data_columns=['utility', 'cpu_utility']
         )
         return self.run_table_model
 
@@ -92,15 +87,16 @@ class RunnerConfig:
     def before_run(self) -> None:
         """Perform any activity required before starting a run.
         No context is available here as the run is not yet active (BEFORE RUN)"""
-        self.exemplar = SwitchExemplar(auto_start=False)
+        self.exemplar = SwitchExemplar(auto_start=True)
         self.strategy = SwitchStrategy(self.exemplar)
         time.sleep(3)
 
         # Require user interaction before proceeding to the next run
-        input("Reload the dataset. Start processing on Switch then press Enter to start the next experiment run...")
+        # input("Reload the dataset. Start processing on Switch then press Enter to start the next experiment run...")
+        input(
+            "Make sure the frontend, kibana and elastic search are already running!! The backend will start automatically. Press ENTER to continue")
 
         output.console_log("Config.before_run() called!")
-
 
     def start_run(self, context: RunnerContext) -> None:
         """Perform any activity required for starting the run here.
@@ -115,26 +111,37 @@ class RunnerConfig:
 
     def start_measurement(self, context: RunnerContext) -> None:
         """Perform any activity required for starting measurements."""
+        # TODO Create method that polls until turns on
+        # self.strategy.get_monitor_schema()
+        # self.strategy.get_adaptation_options_schema()
+        # self.strategy.get_execute_schema()
         output.console_log("Config.start_measurement() called!")
 
     def interact(self, context: RunnerContext) -> None:
         """Perform any interaction with the running target system here, or block here until the target finishes."""
         time_slept = 0
-        self.strategy.get_monitor_schema()
-        self.strategy.get_adaptation_options_schema()
-        self.strategy.get_execute_schema()
         done = False
+        # Endpoint URL
+        endpoint = "http://localhost:3001/api/upload"
+
+        # File paths
+        csv_path = "UPISAS/experiment_runner_configs/upload/var_rate_300.csv"
+        zip_path = "UPISAS/experiment_runner_configs/upload/animals.zip"
+
+        time.sleep(10)
+
+        upload_files(endpoint, csv_path, zip_path)
 
         while done == False:
             self.strategy.monitor(verbose=True)
             current_img = self.strategy.knowledge.monitored_data["log_id"][-1]
             print("LOG_ID", current_img)
             if self.strategy.analyze():
-                   if self.strategy.plan():
-                       if self.strategy.knowledge.plan_data is not None:
-                            self.strategy.execute()
-                       else:
-                           print("MAPE-K Loop: No adaptation")
+                    self.strategy.plan()
+                    # if self.strategy.knowledge.plan_data is not None:
+                    #     self.strategy.execute()
+                    # else:
+                    #     print("MAPE-K Loop: No adaptation")
             time.sleep(1)
             time_slept += 1
             done = current_img == self.total_imgs
@@ -163,7 +170,7 @@ class RunnerConfig:
         basicRevenue = 1
         optRevenue = 1.5
         serverCost = 10
-        
+
         precision = 1e-5
         data = self.strategy.knowledge.monitored_data
         utilities = []
@@ -194,7 +201,7 @@ class RunnerConfig:
 
             with open(csv_filename, mode='a', newline='') as csv_file:
                 fieldnames = [
-                    "image", "timestamp",  "input_rate", "confidence", "absolute_time_from_start", "cpu_utility",
+                    "image", "timestamp", "input_rate", "confidence", "absolute_time_from_start", "cpu_utility",
                     "detection_boxes", "model_processing_time", "image_processing_time",
                     "utility", "model",
                 ]

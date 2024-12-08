@@ -35,7 +35,6 @@ class Strategy(ABC):
         return True
 
     def execute(self, adaptation=None, endpoint_suffix="execute", with_validation=True):
-        print("SWITCHING TO: ", self.knowledge.plan_data['model_option'])
         if(not adaptation): adaptation= self.knowledge.plan_data
         if with_validation:
             if(not self.knowledge.execute_schema): self.get_execute_schema()

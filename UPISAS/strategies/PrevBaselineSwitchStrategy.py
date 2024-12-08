@@ -1,35 +1,53 @@
-import os
-import time
-import pandas as pd
+from UPISAS.strategies.helpers.predict import predict_future_metrics
 from UPISAS.strategy import Strategy
 import UPISAS.exemplars.switch_interface as switch
+import optuna
 
-
-def _load_thresholds():
-    print("Current working directory:", os.getcwd())
-    df = pd.read_csv('knowledge.csv', header=None)
-    array = df.to_numpy()
-
-    return {
-        "yolov5n_rate_min": array[0][1],
-        "yolov5n_rate_max": array[0][2],
-        "yolov5s_rate_min": array[1][1],
-        "yolov5s_rate_max": array[1][2],
-        "yolov5m_rate_min": array[2][1],
-        "yolov5m_rate_max": array[2][2],
-        "yolov5l_rate_min": array[3][1],
-        "yolov5l_rate_max": array[3][2],
-        "yolov5x_rate_min": array[4][1],
-        "yolov5x_rate_max": array[4][2],
-    }
-
+# Global thresholds for analysis
+THRESHOLDS = {
+    "cpu_utilization": {"upper": 80, "lower": 20},  # percent
+    "confidence": {"lower": 0.5},  # minimum confidence level
+    "processing_time": {"upper": 2}  # seconds per image
+}
 
 class SwitchStrategy(Strategy):
     def __init__(self, exemplar):
         super().__init__(exemplar)
         self.count = 0
         self.time = -1  # For tracking when thresholds are violated
-        self.thresholds = _load_thresholds()
+        self.adaptation_needed = None
+        self.metric_history = []
+        self.study = optuna.create_study(direction='maximize')
+
+    def optimize_thresholds(self):
+        def objective(trial):
+            # Define hyperparameters (thresholds) to be optimized
+            cpu_utilization_upper = trial.suggest_int("cpu_utilization_upper", 50, 100)
+            cpu_utilization_lower = trial.suggest_int("cpu_utilization_lower", 0, 30)
+            confidence_lower = trial.suggest_float("confidence_lower", 0.3, 1.0)
+            processing_time_upper = trial.suggest_int("processing_time_upper", 1, 5)
+
+            # Update thresholds for this trial
+            self.thresholds = {
+                "cpu_utilization": {"upper": cpu_utilization_upper, "lower": cpu_utilization_lower},
+                "confidence": {"lower": confidence_lower},
+                "processing_time": {"upper": processing_time_upper}
+            }
+
+            # Calculate cumulative utility over the simulated iterations
+            total_utility = sum(metric['utility'] for metric in self.metric_history)
+            return -total_utility  # Minimize negative utility
+
+        study = optuna.create_study(direction="minimize")
+        study.optimize(objective, n_trials=100)  # Adjust n_trials as needed
+
+        # Update thresholds with the best found values
+        best_params = study.best_params
+        self.thresholds = {
+            "cpu_utilization": {"upper": best_params["cpu_utilization_upper"], "lower": best_params["cpu_utilization_lower"]},
+            "confidence": {"lower": best_params["confidence_lower"]},
+            "processing_time": {"upper": best_params["processing_time_upper"]}
+        }
 
     def analyze(self):
         print("Analyzing")
@@ -38,66 +56,68 @@ class SwitchStrategy(Strategy):
         input_rate = data["input_rate"]
         cpu_utilization = data["cpu"]
         confidence = data["confidence"]
-        processing_time = data["image_processing_time"]
-        model = data["model"]
+        image_processing_time = data["image_processing_time"]
+        model_processing_time = data["model_processing_time"]
+        current_model = data["model"]
+        utility = data["utility"]
 
         # Store data for further use
-        self.knowledge.analysis_data['input_rate'] = input_rate
-        self.knowledge.analysis_data['cpu'] = cpu_utilization
-        self.knowledge.analysis_data['model'] = model
-        self.knowledge.analysis_data['confidence'] = confidence
-        self.knowledge.analysis_data['image_processing_time'] = processing_time
+        self.knowledge.analysis_data['model'] = current_model
 
-        print(f"Input Rate: {input_rate}, CPU Utilization: {cpu_utilization}, Confidence: {confidence}, Processing Time: {processing_time}, Model: {model}")
+        # Append to metric history
+        self.metric_history.append({
+            "cpu_utilization": cpu_utilization,
+            "confidence": confidence,
+            "image_processing_time": image_processing_time,
+            "model_processing_time": model_processing_time,
+            "utility": utility
+        })
 
-        alpha_cpu, alpha_conf, alpha_pt = 0.5, 0.25, 0.25
-        gamma = (cpu_utilization * alpha_cpu - confidence * alpha_conf + processing_time * alpha_pt)
-        print(f"Effectiveness Metric (Gamma): {gamma}")
+        # Once we have 20 entries, predict metrics for 10 seconds from now
+        if len(self.metric_history) == 20:
+            predicted_metrics = predict_future_metrics(self.metric_history, horizon=10)
+            cpu_utilization = predicted_metrics["cpu"]
+            confidence = predicted_metrics["confidence"]
+            image_processing_time = predicted_metrics["image_processing_time"]
+            model_processing_time = predicted_metrics["model_processing_time"]
 
-        str_min = f"{model}_rate_min"
-        str_max = f"{model}_rate_max"
 
-        min_val = self.thresholds.get(str_min)
-        max_val = self.thresholds.get(str_max)
-        current_time = time.time()
+        # Check if adaptation is needed based on optimized thresholds
+        _pending_adaptation = None
+        if (cpu_utilization > self.thresholds["cpu_utilization_upper"]) or \
+                (image_processing_time > self.thresholds["processing_time_upper"]) or \
+                (confidence < self.thresholds["confidence_lower"]):
+            _pending_adaptation = "smaller"
+        elif (cpu_utilization < self.thresholds["cpu_utilization_lower"]) and \
+                (confidence >= self.thresholds["confidence_lower"]) and \
+                (image_processing_time <= self.thresholds["processing_time_upper"]):
+            _pending_adaptation = "larger"
 
-        # Check if the input rate violates thresholds or if CPU utilization is too high
-        threshold_violation = not (min_val <= input_rate <= max_val)
-        high_cpu_utilization = cpu_utilization > 80
-        low_effectiveness = gamma > 1.0
-
-        if threshold_violation or high_cpu_utilization or low_effectiveness:
-            print("Thresholds violated, CPU utilization too high, or low effectiveness detected")
-            if self.time == -1:
-                self.time = current_time
-            elif (current_time - self.time) > 0.25:  # Threshold violation persists
-                self.count += 1
-                print({'Component': "Analyzer", "Action": "Creating adaptation plan"})
+        if _pending_adaptation:
+            print(f"Thresholds violated, need to switch to {_pending_adaptation} model.")
+            self.adaptation_needed = _pending_adaptation
         else:
-            self.time = -1
+            self.adaptation_needed = None
 
         return True
 
     def plan(self):
         print("Planning")
-        input_rate = self.knowledge.analysis_data['input_rate']
-        cpu_utilization = self.knowledge.analysis_data['cpu']
-        model = self.knowledge.analysis_data['model']
+        if self.adaptation_needed:
+            best_model_name = self.knowledge.analysis_data['best_model']
+            new_model_index = model_to_option(best_model_name)
+            current_model = self.knowledge.analysis_data['model']
+            current_model_index = model_to_option(current_model)
 
-        # Adapt thresholds based on analysis data
-        new_min_threshold = input_rate * 0.9 if cpu_utilization > 80 else input_rate * 0.95
-        new_max_threshold = input_rate * 1.1 if cpu_utilization > 80 else input_rate * 1.05
-
-        # Ensure the values make logical sense for adaptation
-        new_min_threshold = max(0, new_min_threshold)
-
-        # Create plan_data entries compatible with the execute schema
-        self.knowledge.plan_data = [
-            {"option": f"{model}_rate_min", "new_value": new_min_threshold},
-            {"option": f"{model}_rate_max", "new_value": new_max_threshold}
-        ]
-
-        print(f"Plan to update thresholds for {model}:")
-        print(f"New Min Threshold: {new_min_threshold}, New Max Threshold: {new_max_threshold}")
+            if new_model_index != current_model_index:
+                print(f"Switching model from {current_model} to {best_model_name}.")
+                # Store the plan to switch model
+                self.knowledge.plan_data = {'model_option': new_model_index}
+            else:
+                print("No adaptation needed as the current model is already optimal.")
+                self.knowledge.plan_data = None
+        else:
+            print("No adaptation needed")
+            self.knowledge.plan_data = None
 
         return True

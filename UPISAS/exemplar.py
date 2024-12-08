@@ -14,36 +14,56 @@ class Exemplar(ABC):
     A class which encapsulates a self-adaptive exemplar run in a docker container.
     """
     _container_name = ""
+
     def __init__(self, base_endpoint: "string with the URL of the exemplar's HTTP server", \
                  docker_kwargs,
-                 auto_start: "Whether to immediately start the container after creation" =False,
-                 ):
+                 auto_start: "Whether to immediately start the container after creation" = False):
         '''Create an instance of the Exemplar class'''
         self.base_endpoint = base_endpoint
         image_name = docker_kwargs["image"]
+        container_name = docker_kwargs.get("name")  # Optional container name to uniquely identify
         image_owner = image_name.split("/")[0]
+
         try:
             docker_client = docker.from_env()
+
+            # Check if the container already exists
+            existing_containers = docker_client.containers.list(all=True, filters={"name": container_name})
+            if existing_containers:
+                self.exemplar_container = existing_containers[0]
+                if self.exemplar_container.status == "running":
+                    logging.info(f"Container '{container_name}' is already running.")
+                    return
+                else:
+                    logging.info(f"Container '{container_name}' exists but is not running. Starting it...")
+                    self.exemplar_container.start()
+                    return
+
+            # Handle the Docker image
             try:
                 docker_client.images.get(image_name)
-                logging.info(f"image '{image_name}' found locally")
+                logging.info(f"Image '{image_name}' found locally.")
             except docker.errors.ImageNotFound:
-                logging.info(f"image '{image_name}' not found locally")
+                logging.info(f"Image '{image_name}' not found locally.")
                 images_from_owner = docker_client.images.search(image_owner)
                 if image_name.split(":")[0] in [i["name"] for i in images_from_owner]:
-                    logging.info(f"image '{image_name}' found on DockerHub, pulling it")
+                    logging.info(f"Image '{image_name}' found on DockerHub, pulling it.")
                     with Progress() as progress:
                         for line in docker_client.api.pull(image_name, stream=True, decode=True):
                             show_progress(line, progress)
                 else:
-                    logging.error(f"image '{image_name}' not found on DockerHub, exiting!")
+                    logging.error(f"Image '{image_name}' not found on DockerHub, exiting!")
                     raise DockerImageNotFoundOnDockerHub
+
+            # Create the container
             docker_kwargs["detach"] = True
             self.exemplar_container = docker_client.containers.create(**docker_kwargs)
+
         except DockerException as e:
-            # TODO: Properly catch various errors. Currently, a lot of errors might be caught here.
-            # Please check the logs if that happens.
+            # Handle Docker-related exceptions
             raise e
+
+        # Auto-start the container if specified
         if auto_start:
             self.start_container()
 
