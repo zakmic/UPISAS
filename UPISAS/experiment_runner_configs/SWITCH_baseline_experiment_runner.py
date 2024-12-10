@@ -61,7 +61,8 @@ class RunnerConfig:
             (RunnerEvents.AFTER_EXPERIMENT, self.after_experiment)
         ])
         self.run_table_model = None  # Initialized later
-        self.total_imgs = 300  # Total number of images in the experiment
+        self.total_imgs = 10  # Smaller Experiment
+        # self.total_imgs = 300  # Actual dataset was 300
 
         output.console_log("Custom config loaded")
 
@@ -156,7 +157,7 @@ class RunnerConfig:
     def stop_run(self, context: RunnerContext) -> None:
         """Perform any activity here required for stopping the run.
         Activities after stopping the run should also be performed here."""
-        # self.exemplar.stop_container()
+        self.exemplar.stop_container()
 
         output.console_log("You can end the current run. Manually starting the next run is required")
 

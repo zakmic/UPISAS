@@ -29,7 +29,7 @@ class SwitchStrategy(Strategy):
             "confidence_lower": 0.5,
             "processing_time_upper": 2
         }
-        self.study = optuna.create_study(direction="maximize",sampler=RandomSampler())  # Rnaodm Sampler for increased exploration
+        self.study = optuna.create_study(direction="maximize",sampler=RandomSampler())  # Random Sampler for increased exploration
 
     def analyze(self):
         print("Analyzing")
@@ -133,7 +133,7 @@ class SwitchStrategy(Strategy):
                 new_model_index = model_index
 
             if new_model_index != model_index:
-                print(f"Switching model from {model} to {self.adaptation_needed}.")
+                print(f"Switching model from {model} to {self.adaptation_needed} {new_model_index}")
                 # Store the plan to switch model
                 self.knowledge.plan_data = {'model_option': new_model_index}
             else:
